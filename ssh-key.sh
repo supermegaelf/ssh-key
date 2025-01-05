@@ -7,7 +7,8 @@ check_command() {
   fi
 }
 
-echo "Generate SSH key:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"
+echo "Generate SSH key on your local machine using following command:"
+echo 'ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"'
 
 echo "Setting up SSH on server..."
 
@@ -23,22 +24,24 @@ echo "Setting up SSH configuration file..."
 
 config_file="/etc/ssh/sshd_config"
 
-update_config() {
+update_or_uncomment_config() {
   local param="$1"
   local value="$2"
-  if grep -q "^$param" "$config_file"; then
+  if grep -q "^#$param" "$config_file"; then
+    sed -i "s/^#$param.*/$param $value/" "$config_file"
+  elif grep -q "^$param" "$config_file"; then
     sed -i "s/^$param.*/$param $value/" "$config_file"
   else
     echo "$param $value" >> "$config_file"
   fi
 }
 
-check_command update_config "PubkeyAuthentication" "yes"
-check_command update_config "PasswordAuthentication" "no"
+check_command update_or_uncomment_config "PubkeyAuthentication" "yes"
+check_command update_or_uncomment_config "PasswordAuthentication" "no"
 
 check_command systemctl restart ssh
 
-echo "Check your connection using new SSH-key. Do not close current session!"
+echo "Check your connection using new SSH key. Do not close current session!"
 
 read -p "Connection successful? (y/n): " success
 if [[ "$success" == "y" ]]; then
