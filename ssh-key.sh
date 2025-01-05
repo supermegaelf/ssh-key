@@ -8,7 +8,6 @@ check_command() {
 }
 
 echo "Сгенерируйте SSH-ключ:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"
-read -p "Скопируйте публичный ключ и нажмите Enter."
 
 echo "Настройка SSH на сервере..."
 
