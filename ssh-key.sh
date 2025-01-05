@@ -40,7 +40,7 @@ check_command systemctl restart ssh
 
 echo "Check your connection using new SSH-key. Do not close current session!"
 
-read -p "Подключение успешно? (y/n): " success
+read -p "Connection successful? (y/n): " success
 if [[ "$success" == "y" ]]; then
     echo "Done."
 else
