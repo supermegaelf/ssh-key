@@ -7,8 +7,8 @@ check_command() {
   fi
 }
 
-echo "Сгенерируйте SSH-ключ на вашей машине с помощью команды:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\Ваше_имя_пользователя\.ssh\server_name"
-read -p "Cкопируйте публичный ключ и нажмите Enter."
+echo "Сгенерируйте SSH-ключ:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"
+read -p "Скопируйте публичный ключ и нажмите Enter."
 
 echo "Настройка SSH на сервере..."
 
@@ -39,9 +39,12 @@ check_command update_config "PasswordAuthentication" "no"
 
 check_command systemctl restart ssh
 
-echo "Отключитесь от сервера и попробуйте подключиться с использованием SSH-ключа."
-echo "Пример команды:"
-echo "ssh -i /path/to/private_key -p порт user@server_ip"
+echo "Проверьте подключение с использованием нового SSH-ключа. Не закрывайте текущую сессию!"
 
-echo "DONE"
-exit 0
+read -p "Подключение успешно? (y/n): " success
+if [[ "$success" == "y" ]]; then
+    echo "Подключение с использованием SSH-ключа успешно подтверждено. DONE."
+else
+    echo "FAILED. Проверьте настройки подключения и повторите попытку."
+    exit 1
+fi
