@@ -10,8 +10,6 @@ check_command() {
 echo "Generate SSH key on your local machine using following command:"
 echo 'ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"'
 
-echo "Setting up SSH on server..."
-
 check_command mkdir -p ~/.ssh
 
 read -p "Insert public key and press Enter: " public_key
@@ -19,8 +17,6 @@ echo "$public_key" >> ~/.ssh/authorized_keys
 
 check_command chmod 700 ~/.ssh
 check_command chmod 600 ~/.ssh/authorized_keys
-
-echo "Setting up SSH configuration file..."
 
 config_file="/etc/ssh/sshd_config"
 
