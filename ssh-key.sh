@@ -7,19 +7,19 @@ check_command() {
   fi
 }
 
-echo "Сгенерируйте SSH-ключ:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"
+echo "Generate SSH key:" ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"
 
-echo "Настройка SSH на сервере..."
+echo "Setting up SSH on server..."
 
 check_command mkdir -p ~/.ssh
 
-read -p "Вставьте публичный ключ: " public_key
+read -p "Insert public key and press Enter: " public_key
 echo "$public_key" >> ~/.ssh/authorized_keys
 
 check_command chmod 700 ~/.ssh
 check_command chmod 600 ~/.ssh/authorized_keys
 
-echo "Настройка файла конфигурации SSH..."
+echo "Setting up SSH configuration file..."
 
 config_file="/etc/ssh/sshd_config"
 
@@ -38,12 +38,12 @@ check_command update_config "PasswordAuthentication" "no"
 
 check_command systemctl restart ssh
 
-echo "Проверьте подключение с использованием нового SSH-ключа. Не закрывайте текущую сессию!"
+echo "Check your connection using new SSH-key. Do not close current session!"
 
 read -p "Подключение успешно? (y/n): " success
 if [[ "$success" == "y" ]]; then
-    echo "Подключение с использованием SSH-ключа успешно подтверждено. DONE."
+    echo "Done."
 else
-    echo "FAILED. Проверьте настройки подключения и повторите попытку."
+    echo "Failed. Check your settings."
     exit 1
 fi
