@@ -1,48 +1,74 @@
 #!/bin/bash
 
+SSH_CONFIG="/etc/ssh/sshd_config"
+BACKUP_CONFIG="${SSH_CONFIG}.bak.$(date +%F_%T)"
+SSH_DIR="$HOME/.ssh"
+AUTHORIZED_KEYS="${SSH_DIR}/authorized_keys"
+
 check_command() {
-  if ! "$@"; then
-    echo "FAILED"
-    exit 1
-  fi
+    if ! "$@"; then
+        echo "FAILED: $1"
+        exit 1
+    fi
 }
 
-echo "Generate SSH key on your local machine using following command:"
-echo 'ssh-keygen -t ed25519 -C "server_name" -f "C:\Users\your_username\.ssh\server_name"'
+if ! systemctl is-active ssh &> /dev/null; then
+    echo "Error: SSH service is not running or not installed."
+    exit 1
+fi
 
-check_command mkdir -p ~/.ssh
+echo "Generate SSH key on your local machine with one of these commands:"
+echo "For Windows: ssh-keygen -t ed25519 -C \"server_name\" -f \"C:\\Users\\your_username\\.ssh\\server_name\""
+echo "For Linux/Mac: ssh-keygen -t ed25519 -C \"server_name\" -f \"~/.ssh/server_name\""
+echo "After generating, copy the PUBLIC key (e.g., from server_name.pub) below."
+
+check_command mkdir -p "${SSH_DIR}"
 
 read -p "Insert public key and press Enter: " public_key
-echo "$public_key" >> ~/.ssh/authorized_keys
+if [ -f "${AUTHORIZED_KEYS}" ]; then
+    echo "$public_key" | tee -a "${AUTHORIZED_KEYS}" > /dev/null
+else
+    echo "$public_key" > "${AUTHORIZED_KEYS}"
+fi
+check_command "Adding public key to ${AUTHORIZED_KEYS}"
 
-check_command chmod 700 ~/.ssh
-check_command chmod 600 ~/.ssh/authorized_keys
+check_command chmod 700 "${SSH_DIR}"
+check_command chmod 600 "${AUTHORIZED<|control198|>_KEYS}"
 
-config_file="/etc/ssh/sshd_config"
+check_command cp "${SSH_CONFIG}" "${BACKUP_CONFIG}"
 
 update_or_uncomment_config() {
-  local param="$1"
-  local value="$2"
-  if grep -q "^#$param" "$config_file"; then
-    sed -i "s/^#$param.*/$param $value/" "$config_file"
-  elif grep -q "^$param" "$config_file"; then
-    sed -i "s/^$param.*/$param $value/" "$config_file"
-  else
-    echo "$param $value" >> "$config_file"
-  fi
+    local param="$1"
+    local value="$2"
+    if grep -q "^#*$param" "$SSH_CONFIG"; then
+        sed -i "s/^#*$param.*/$param $value/" "$SSH_CONFIG"
+    else
+        echo "$param $value" >> "$SSH_CONFIG"
+    fi
 }
 
 check_command update_or_uncomment_config "PubkeyAuthentication" "yes"
 check_command update_or_uncomment_config "PasswordAuthentication" "no"
 
+if ! sshd -t; then
+    echo "FAILED: SSH config syntax check failed. Reverting changes..."
+    cp "${BACKUP_CONFIG}" "${SSH_CONFIG}"
+    exit 1
+fi
+
 check_command systemctl restart ssh
 
-echo "Check your connection using new SSH key. Do not close current session!"
-
+echo "Test SSH connection using the new key in a new terminal."
+echo "Example: ssh -i ~/.ssh/server_name user@<server-ip>"
+echo "Do not close this session until you confirm connectivity!"
 read -p "Connection successful? (y/n): " success
-if [[ "$success" == "y" ]]; then
-    echo "Done."
+
+if [[ "$success" =~ ^[Yy]$ ]]; then
+    echo "Done. SSH configured to use key-based authentication."
 else
-    echo "Failed. Check your settings."
+    echo "Connection failed. Reverting changes..."
+    cp "${BACKUP_CONFIG}" "${SSH_CONFIG}"
+    systemctl restart ssh
+    echo "Reverted to original SSH config. Check your key and settings."
     exit 1
 fi
