@@ -26,14 +26,14 @@ check_command mkdir -p "${SSH_DIR}"
 
 read -p "Insert public key and press Enter: " public_key
 if [ -f "${AUTHORIZED_KEYS}" ]; then
-    echo "$public_key" | tee -a "${AUTHORIZED_KEYS}" > /dev/null
+    echo "$public_key" >> "${AUTHORIZED_KEYS}"
 else
     echo "$public_key" > "${AUTHORIZED_KEYS}"
 fi
 check_command "Adding public key to ${AUTHORIZED_KEYS}"
 
 check_command chmod 700 "${SSH_DIR}"
-check_command chmod 600 "${AUTHORIZED<|control198|>_KEYS}"
+check_command chmod 600 "${AUTHORIZED_KEYS}"
 
 check_command cp "${SSH_CONFIG}" "${BACKUP_CONFIG}"
 
