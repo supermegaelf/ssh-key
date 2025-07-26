@@ -28,9 +28,9 @@ BACKUP_CONFIG="${SSH_CONFIG}.bak.$(date +%F_%T)"
 SSH_DIR="$HOME/.ssh"
 AUTHORIZED_KEYS="${SSH_DIR}/authorized_keys"
 
-#======================
+#===================
 # UTILITY FUNCTIONS
-#======================
+#===================
 
 check_command() {
     if ! "$@"; then
@@ -50,9 +50,9 @@ update_or_uncomment_config() {
     fi
 }
 
-#==========================
+#======================
 # SERVICE VERIFICATION
-#==========================
+#======================
 
 verify_ssh_service() {
     echo -e "${GREEN}Service Verification${NC}"
@@ -89,9 +89,9 @@ display_key_generation_instructions() {
     echo
 }
 
-#==========================
+#=====================
 # SSH DIRECTORY SETUP
-#==========================
+#=====================
 
 setup_ssh_directory() {
     echo -e "${GREEN}SSH Directory Setup${NC}"
@@ -107,9 +107,9 @@ setup_ssh_directory() {
     echo
 }
 
-#=========================
+#==================
 # PUBLIC KEY INPUT
-#=========================
+#==================
 
 input_public_key() {
     echo -e "${GREEN}Public Key Input${NC}"
@@ -141,9 +141,9 @@ input_public_key() {
     echo
 }
 
-#==========================
+#==================
 # FILE PERMISSIONS
-#==========================
+#==================
 
 set_file_permissions() {
     echo -e "${GREEN}File Permissions${NC}"
@@ -160,9 +160,9 @@ set_file_permissions() {
     echo
 }
 
-#=============================
+#======================
 # CONFIGURATION BACKUP
-#=============================
+#======================
 
 create_configuration_backup() {
     echo -e "${GREEN}Configuration Backup${NC}"
@@ -178,9 +178,9 @@ create_configuration_backup() {
     echo
 }
 
-#===============================
+#==========================
 # SSH CONFIGURATION UPDATE
-#===============================
+#==========================
 
 update_ssh_configuration() {
     echo -e "${GREEN}SSH Configuration Update${NC}"
@@ -197,9 +197,9 @@ update_ssh_configuration() {
     echo
 }
 
-#==============================
+#==========================
 # CONFIGURATION VALIDATION
-#==============================
+#==========================
 
 validate_ssh_configuration() {
     echo -e "${GREEN}Configuration Validation${NC}"
@@ -221,9 +221,9 @@ validate_ssh_configuration() {
     echo
 }
 
-#====================
+#=================
 # SERVICE RESTART
-#====================
+#=================
 
 restart_ssh_service() {
     echo -e "${GREEN}Service Restart${NC}"
@@ -239,9 +239,9 @@ restart_ssh_service() {
     echo
 }
 
-#========================
+#====================
 # CONNECTION TESTING
-#========================
+#====================
 
 test_ssh_connection() {
     echo -e "${GREEN}Connection Testing${NC}"
@@ -269,9 +269,9 @@ test_ssh_connection() {
     echo
 }
 
-#===========================
+#====================
 # COMPLETION DISPLAY
-#===========================
+#====================
 
 display_completion_info() {
     echo -e "${PURPLE}===================${NC}"
