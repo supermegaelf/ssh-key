@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#==============================
-# SSH KEY AUTHENTICATION SETUP
-#==============================
+#====================
+# SSH KEY AUTH SETUP
+#====================
 
 # Color constants
 readonly RED='\033[0;31m'
@@ -28,9 +28,9 @@ BACKUP_CONFIG="${SSH_CONFIG}.bak.$(date +%F_%T)"
 SSH_DIR="$HOME/.ssh"
 AUTHORIZED_KEYS="${SSH_DIR}/authorized_keys"
 
-#===================
+#======================
 # UTILITY FUNCTIONS
-#===================
+#======================
 
 check_command() {
     if ! "$@"; then
@@ -50,9 +50,9 @@ update_or_uncomment_config() {
     fi
 }
 
-#======================
+#==========================
 # SERVICE VERIFICATION
-#======================
+#==========================
 
 verify_ssh_service() {
     echo -e "${GREEN}Service Verification${NC}"
@@ -69,11 +69,6 @@ verify_ssh_service() {
     fi
     echo -e "${GRAY}  ${ARROW}${NC} SSH service is active and running"
     echo -e "${GREEN}${CHECK}${NC} SSH service verification completed!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Service verification completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────────${NC}"
     echo
 }
 
@@ -91,17 +86,12 @@ display_key_generation_instructions() {
     echo -e "${GRAY}  ${ARROW}${NC} Replace 'server_name' with meaningful identifier"
     echo -e "${GRAY}  ${ARROW}${NC} Use ed25519 algorithm for enhanced security"
     echo -e "${GREEN}${CHECK}${NC} Key generation instructions completed!"
-
-    echo
-    echo -e "${GREEN}──────────────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Key generation instructions completed successfully!"
-    echo -e "${GREEN}──────────────────────────────────────────────────────${NC}"
     echo
 }
 
-#=====================
+#==========================
 # SSH DIRECTORY SETUP
-#=====================
+#==========================
 
 setup_ssh_directory() {
     echo -e "${GREEN}SSH Directory Setup${NC}"
@@ -114,17 +104,12 @@ setup_ssh_directory() {
     check_command mkdir -p "${SSH_DIR}"
     echo -e "${GRAY}  ${ARROW}${NC} SSH directory created successfully"
     echo -e "${GREEN}${CHECK}${NC} SSH directory setup completed!"
-
-    echo
-    echo -e "${GREEN}──────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} SSH directory setup completed successfully!"
-    echo -e "${GREEN}──────────────────────────────────────────────${NC}"
     echo
 }
 
-#==================
+#=========================
 # PUBLIC KEY INPUT
-#==================
+#=========================
 
 input_public_key() {
     echo -e "${GREEN}Public Key Input${NC}"
@@ -136,10 +121,11 @@ input_public_key() {
     echo
     echo -e "${YELLOW}Create for Linux/Mac:${NC}"
     echo -e "${WHITE}ssh-keygen -t ed25519 -C \"server_name\" -f \"~/.ssh/server_name\"${NC}"
-    echo
 
+    echo
     echo -ne "${CYAN}Insert public key and press Enter: ${NC}"
     read public_key
+    echo
 
     echo -e "${CYAN}${INFO}${NC} Adding public key to authorized keys..."
     echo -e "${GRAY}  ${ARROW}${NC} Creating authorized_keys file"
@@ -152,17 +138,12 @@ input_public_key() {
     fi
     echo -e "${GRAY}  ${ARROW}${NC} Public key added successfully"
     echo -e "${GREEN}${CHECK}${NC} Public key configuration completed!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Public key input completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────${NC}"
     echo
 }
 
-#==================
+#==========================
 # FILE PERMISSIONS
-#==================
+#==========================
 
 set_file_permissions() {
     echo -e "${GREEN}File Permissions${NC}"
@@ -176,17 +157,12 @@ set_file_permissions() {
     check_command chmod 600 "${AUTHORIZED_KEYS}"
     echo -e "${GRAY}  ${ARROW}${NC} File permissions configured securely"
     echo -e "${GREEN}${CHECK}${NC} File permissions configured!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} File permissions completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────${NC}"
     echo
 }
 
-#======================
+#=============================
 # CONFIGURATION BACKUP
-#======================
+#=============================
 
 create_configuration_backup() {
     echo -e "${GREEN}Configuration Backup${NC}"
@@ -199,17 +175,12 @@ create_configuration_backup() {
     check_command cp "${SSH_CONFIG}" "${BACKUP_CONFIG}"
     echo -e "${GRAY}  ${ARROW}${NC} Configuration backup created successfully"
     echo -e "${GREEN}${CHECK}${NC} Configuration backup created!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Configuration backup completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────────${NC}"
     echo
 }
 
-#==========================
+#===============================
 # SSH CONFIGURATION UPDATE
-#==========================
+#===============================
 
 update_ssh_configuration() {
     echo -e "${GREEN}SSH Configuration Update${NC}"
@@ -223,17 +194,12 @@ update_ssh_configuration() {
     check_command update_or_uncomment_config "PasswordAuthentication" "no"
     echo -e "${GRAY}  ${ARROW}${NC} SSH security parameters updated"
     echo -e "${GREEN}${CHECK}${NC} SSH configuration updated!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} SSH configuration update completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────────────${NC}"
     echo
 }
 
-#==========================
+#==============================
 # CONFIGURATION VALIDATION
-#==========================
+#==============================
 
 validate_ssh_configuration() {
     echo -e "${GREEN}Configuration Validation${NC}"
@@ -252,17 +218,12 @@ validate_ssh_configuration() {
     fi
     echo -e "${GRAY}  ${ARROW}${NC} Configuration syntax is valid"
     echo -e "${GREEN}${CHECK}${NC} Configuration syntax validation passed!"
-
-    echo
-    echo -e "${GREEN}───────────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Configuration validation completed successfully!"
-    echo -e "${GREEN}───────────────────────────────────────────────────${NC}"
     echo
 }
 
-#=================
+#====================
 # SERVICE RESTART
-#=================
+#====================
 
 restart_ssh_service() {
     echo -e "${GREEN}Service Restart${NC}"
@@ -275,17 +236,12 @@ restart_ssh_service() {
     check_command systemctl restart ssh
     echo -e "${GRAY}  ${ARROW}${NC} SSH service restarted with new settings"
     echo -e "${GREEN}${CHECK}${NC} SSH service restarted successfully!"
-
-    echo
-    echo -e "${GREEN}──────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Service restart completed successfully!"
-    echo -e "${GREEN}──────────────────────────────────────────${NC}"
     echo
 }
 
-#====================
+#========================
 # CONNECTION TESTING
-#====================
+#========================
 
 test_ssh_connection() {
     echo -e "${GREEN}Connection Testing${NC}"
@@ -304,7 +260,7 @@ test_ssh_connection() {
     read success
 
     if [[ "$success" =~ ^[Yy]$ ]]; then
-        echo
+        :
     else
         echo
         echo -e "${YELLOW}${WARNING}${NC} Connection failed. Reverting changes..."
@@ -316,15 +272,12 @@ test_ssh_connection() {
         exit 1
     fi
 
-    echo -e "${GREEN}─────────────────────────────────────────────${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Connection testing completed successfully!"
-    echo -e "${GREEN}─────────────────────────────────────────────${NC}"
     echo
 }
 
-#====================
+#===========================
 # COMPLETION DISPLAY
-#====================
+#===========================
 
 display_completion_info() {
     echo -e "${PURPLE}===================${NC}"
@@ -345,9 +298,9 @@ display_completion_info() {
 
 main() {
     echo
-    echo -e "${PURPLE}=============================${NC}"
-    echo -e "${WHITE}SSH KEY AUTHENTICATION SETUP${NC}"
-    echo -e "${PURPLE}=============================${NC}"
+    echo -e "${PURPLE}===================${NC}"
+    echo -e "${WHITE}SSH KEY AUTH SETUP${NC}"
+    echo -e "${PURPLE}===================${NC}"
     echo
 
     verify_ssh_service
