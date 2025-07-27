@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#====================
-# SSH KEY AUTH SETUP
-#====================
+#=================
+# SSH KEY MANAGER
+#=================
 
 # Color constants
 readonly RED='\033[0;31m'
@@ -274,9 +274,9 @@ test_ssh_connection() {
 #====================
 
 display_completion_info() {
-    echo -e "${PURPLE}==================${NC}"
-    echo -e "${GREEN}${CHECK}${NC} Setup complete!"
-    echo -e "${PURPLE}==================${NC}"
+    echo -e "${PURPLE}=========================${NC}"
+    echo -e "${GREEN}${CHECK}${NC} Installation complete!"
+    echo -e "${PURPLE}=========================${NC}"
     echo
     echo -e "${CYAN}Configuration Summary:${NC}"
     echo -e "${WHITE}• SSH key-based authentication enabled${NC}"
@@ -292,9 +292,9 @@ display_completion_info() {
 
 main() {
     echo
-    echo -e "${PURPLE}===================${NC}"
-    echo -e "${WHITE}SSH KEY AUTH SETUP${NC}"
-    echo -e "${PURPLE}===================${NC}"
+    echo -e "${PURPLE}================${NC}"
+    echo -e "${WHITE}SSH KEY MANAGER${NC}"
+    echo -e "${PURPLE}================${NC}"
     echo
 
     verify_ssh_service
