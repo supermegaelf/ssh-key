@@ -310,4 +310,5 @@ main() {
     display_completion_info
 }
 
+# Execute main function
 main
