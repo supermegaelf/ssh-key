@@ -125,6 +125,8 @@ input_public_key() {
     echo
     echo -ne "${CYAN}Insert public key and press Enter: ${NC}"
     read public_key
+    public_key="${public_key#"${public_key%%[![:space:]]*}"}"
+    public_key="${public_key%"${public_key##*[![:space:]]}"}"
     echo
 
     echo -e "${CYAN}${INFO}${NC} Adding public key to authorized keys..."
