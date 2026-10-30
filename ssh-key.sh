@@ -398,27 +398,23 @@ test_ssh_connection() {
     echo -e "${GREEN}==================${NC}"
     echo
 
-    echo -e "${YELLOW}${WARNING}${NC} Keep this session open. Test a NEW connection in another terminal."
-    local client_ip client_port server_ip server_port
-    read -r client_ip client_port server_ip server_port <<< "$SSH_CONNECTION"
-    server_ip="${server_ip:-SERVER_IP}"
-    server_port="${server_port:-22}"
+    echo -e "${CYAN}${INFO}${NC} Testing SSH connection..."
+    echo -e "${GRAY}  ${ARROW}${NC} Keep the current session open"
+    echo -e "${GRAY}  ${ARROW}${NC} Open a new terminal with connection sharing disabled"
     if [[ "$method" = password ]]; then
-        echo -e "${GRAY}  ${ARROW}${NC} Use the server password. Set one with passwd in this session if needed."
-        echo -e "${WHITE}ssh -F none -S none -p ${server_port} -o PubkeyAuthentication=no -o PreferredAuthentications=password root@${server_ip}${NC}"
+        echo -e "${GRAY}  ${ARROW}${NC} Test password authentication without SSH keys"
     else
-        echo -e "${GRAY}  ${ARROW}${NC} Use the private key matching the public key just added."
-        echo -e "${WHITE}ssh -F none -S none -p ${server_port} -o IdentityAgent=none -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -i \"PATH_TO_PRIVATE_KEY\" root@${server_ip}${NC}"
+        echo -e "${GRAY}  ${ARROW}${NC} Use only the new key; disable SSH agent and password fallback"
     fi
     echo
     echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
     read -r success
 
     if [[ "$success" =~ ^[Yy]$ ]]; then
-        :
+        echo -e "${GREEN}${CHECK}${NC} SSH connection tested successfully!"
     else
         echo
-        echo -e "${YELLOW}${WARNING}${NC} Connection failed. Reverting changes..."
+        echo -e "${RED}${CROSS}${NC} Connection failed. Reverting changes..."
         echo
         exit 1
     fi
@@ -583,6 +579,7 @@ main() {
     show_main_menu
     local choice
     read -r choice
+    echo
     case "$choice" in
         1)
             SELECTED_KEY=""
@@ -593,7 +590,6 @@ main() {
                 update_ssh_key
                 return
             fi
-            echo
             echo -e "${YELLOW}${WARNING}${NC} Exiting..."
             echo
             return 0
@@ -608,7 +604,6 @@ main() {
             ;;
         4)
             if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
-                echo
                 echo -e "${YELLOW}${WARNING}${NC} Exiting..."
                 echo
                 return 0
@@ -617,7 +612,6 @@ main() {
             exit 1
             ;;
         *)
-            echo
             echo -e "${RED}${CROSS}${NC} Invalid option. Please select one of the listed options."
             echo
             exit 1
