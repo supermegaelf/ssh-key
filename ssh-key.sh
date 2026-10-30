@@ -126,29 +126,24 @@ input_public_key() {
 
     echo
     echo -ne "${CYAN}Insert public key and press Enter: ${NC}"
-    IFS= read -r public_key
+    read public_key
     public_key="${public_key#"${public_key%%[![:space:]]*}"}"
     public_key="${public_key%"${public_key##*[![:space:]]}"}"
-    if [[ -z "$public_key" ]]; then
-        echo -e "${RED}${CROSS}${NC} Public key cannot be empty."
-        exit 1
-    fi
     echo
 
     echo -e "${CYAN}${INFO}${NC} Adding public key to authorized keys..."
     echo -e "${GRAY}  ${ARROW}${NC} Creating authorized_keys file"
     echo -e "${GRAY}  ${ARROW}${NC} Appending public key to file"
-    check_command touch "${AUTHORIZED_KEYS}"
+    touch "${AUTHORIZED_KEYS}"
     check_command touch "${MANAGED_KEY}"
-    if grep -Fxq -- "$public_key" "${AUTHORIZED_KEYS}"; then
-        echo -e "${YELLOW}${WARNING}${NC} Public key already exists; it will be preserved on removal."
-        return
+    if ! grep -Fxq -- "$public_key" "${AUTHORIZED_KEYS}"; then
+        if ! printf '%s\n' "$public_key" > "$MANAGED_KEY"; then
+            echo -e "${RED}${CROSS}${NC} FAILED: Saving public key for removal"
+            echo
+            exit 1
+        fi
     fi
-    if ! printf '%s\n' "$public_key" > "$MANAGED_KEY"; then
-        echo -e "${RED}${CROSS}${NC} FAILED: Saving managed public key."
-        exit 1
-    fi
-    if ! printf '\n%s\n' "$public_key" >> "${AUTHORIZED_KEYS}"; then
+    if ! echo "$public_key" >> "${AUTHORIZED_KEYS}"; then
         echo -e "${RED}${CROSS}${NC} FAILED: Adding public key to ${BLUE}${AUTHORIZED_KEYS}${NC}"
         echo
         exit 1
@@ -189,7 +184,6 @@ create_configuration_backup() {
     echo -e "${CYAN}${INFO}${NC} Creating SSH configuration backup..."
     echo -e "${GRAY}  ${ARROW}${NC} Backing up to ${BLUE}${BACKUP_CONFIG}${NC}"
     echo -e "${GRAY}  ${ARROW}${NC} Saving original configuration for removal"
-    check_command mkdir -m 700 "${STATE_DIR}"
     check_command cp -p "${SSH_CONFIG}" "${BACKUP_CONFIG}"
     echo -e "${GRAY}  ${ARROW}${NC} Configuration backup created successfully"
     echo -e "${GREEN}${CHECK}${NC} Configuration backup created!"
@@ -304,23 +298,18 @@ display_completion_info() {
     echo
 }
 
-#==================
-# MAIN ENTRY POINT
-#==================
+#======================
+# SSH KEY INSTALLATION
+#======================
 
 install_ssh_key() {
-    echo
-    echo -e "${PURPLE}================${NC}"
-    echo -e "${WHITE}SSH KEY MANAGER${NC}"
-    echo -e "${PURPLE}================${NC}"
-    echo
-
     verify_ssh_service
     display_key_generation_instructions
     setup_ssh_directory
-    create_configuration_backup
+    check_command mkdir -m 700 "${STATE_DIR}"
     input_public_key
     set_file_permissions
+    create_configuration_backup
     update_ssh_configuration
     validate_ssh_configuration
     restart_ssh_service
@@ -328,19 +317,38 @@ install_ssh_key() {
     display_completion_info
 }
 
+#=================
+# SSH KEY REMOVAL
+#=================
+
 remove_ssh_key() {
+    echo -e "${GREEN}SSH Key Removal${NC}"
+    echo -e "${GREEN}===============${NC}"
     echo
     echo -e "${YELLOW}${WARNING}${NC} This will restore the entire SSH config saved before setup and remove only the key added by this script."
     echo -e "${YELLOW}${WARNING}${NC} Keep this session open and verify access in a new terminal afterwards."
     echo -ne "${YELLOW}Are you sure? (y/n): ${NC}"
     local confirm current_config filtered_keys
     read -r confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || return 0
+    echo
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}${WARNING}${NC} Cancelled"
+        echo
+        return 0
+    fi
 
     verify_ssh_service
+
+    echo -e "${GREEN}Configuration Restore${NC}"
+    echo -e "${GREEN}=====================${NC}"
+    echo
+    echo -e "${CYAN}${INFO}${NC} Restoring SSH configuration..."
+    echo -e "${GRAY}  ${ARROW}${NC} Validating backup ${BLUE}${BACKUP_CONFIG}${NC}"
     check_command sshd -t -f "${BACKUP_CONFIG}"
     current_config=$(mktemp "${SSH_CONFIG}.remove.XXXXXX") || exit 1
+    echo -e "${GRAY}  ${ARROW}${NC} Saving current configuration for rollback"
     check_command cp -p "${SSH_CONFIG}" "$current_config"
+    echo -e "${GRAY}  ${ARROW}${NC} Restoring original configuration and restarting SSH"
     check_command cp -p "${BACKUP_CONFIG}" "${SSH_CONFIG}"
     if ! sshd -t || ! systemctl restart ssh; then
         echo -e "${RED}${CROSS}${NC} Restore failed; reverting to the current SSH config."
@@ -350,27 +358,43 @@ remove_ssh_key() {
         exit 1
     fi
     check_command rm -- "$current_config"
+    echo -e "${GREEN}${CHECK}${NC} SSH configuration restored!"
+    echo
 
+    echo -e "${GREEN}Public Key Removal${NC}"
+    echo -e "${GREEN}==================${NC}"
+    echo
+    echo -e "${CYAN}${INFO}${NC} Removing SSH key setup..."
+    echo -e "${GRAY}  ${ARROW}${NC} Preserving keys that were not added by this script"
     if [[ -s "$MANAGED_KEY" && -f "$AUTHORIZED_KEYS" ]]; then
         filtered_keys=$(mktemp "${STATE_DIR}/authorized_keys.XXXXXX") || exit 1
         check_command awk 'NR == FNR { key = $0; next } $0 != key' "$MANAGED_KEY" "$AUTHORIZED_KEYS" > "$filtered_keys"
         check_command cp "$filtered_keys" "${AUTHORIZED_KEYS}"
         check_command rm -- "$filtered_keys"
     fi
+    echo -e "${GRAY}  ${ARROW}${NC} Removing saved setup files"
     check_command rm -f -- "$MANAGED_KEY" "${BACKUP_CONFIG}"
     check_command rmdir "${STATE_DIR}"
-    echo -e "${GREEN}${CHECK}${NC} SSH key setup removed. Original SSH configuration restored."
+    echo -e "${GREEN}${CHECK}${NC} SSH key setup removed!"
+    echo
+
+    echo -e "${PURPLE}====================${NC}"
+    echo -e "${GREEN}${CHECK}${NC} Removal complete!"
+    echo -e "${PURPLE}====================${NC}"
+    echo
 }
 
-main() {
-    exec < /dev/tty
-    if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}${CROSS}${NC} Script must be run as root."
-        exit 1
-    fi
+#=====================
+# MAIN MENU FUNCTIONS
+#=====================
 
+show_main_menu() {
     echo
+    echo -e "${PURPLE}================${NC}"
     echo -e "${WHITE}SSH KEY MANAGER${NC}"
+    echo -e "${PURPLE}================${NC}"
+    echo
+    echo -e "${CYAN}Please select an option:${NC}"
     echo
     if [[ -d "$STATE_DIR" ]]; then
         echo -e "${RED}1.${NC} Remove SSH key setup"
@@ -380,6 +404,16 @@ main() {
     echo -e "${YELLOW}2.${NC} Exit"
     echo
     echo -ne "${CYAN}Enter your choice: ${NC}"
+}
+
+#==================
+# MAIN ENTRY POINT
+#==================
+
+main() {
+    exec < /dev/tty
+
+    show_main_menu
     local choice
     read -r choice
     case "$choice" in
@@ -390,9 +424,16 @@ main() {
                 install_ssh_key
             fi
             ;;
-        2) return 0 ;;
+        2)
+            echo
+            echo -e "${YELLOW}${WARNING}${NC} Exiting..."
+            echo
+            return 0
+            ;;
         *)
+            echo
             echo -e "${RED}${CROSS}${NC} Invalid option. Please enter 1-2."
+            echo
             exit 1
             ;;
     esac
