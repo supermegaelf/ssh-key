@@ -33,7 +33,6 @@ TRANSACTION_DIR=""
 KEY_LINES=()
 KEY_LABELS=()
 ALL_KEY_LINES=()
-ALL_KEY_LABELS=()
 ALL_KEY_FINGERPRINTS=()
 
 #===================
@@ -106,7 +105,6 @@ load_ssh_keys() {
     KEY_LINES=()
     KEY_LABELS=()
     ALL_KEY_LINES=()
-    ALL_KEY_LABELS=()
     ALL_KEY_FINGERPRINTS=()
     [[ -f "$AUTHORIZED_KEYS" ]] || return 0
     local line label key_file fingerprint legacy_label legacy_fingerprint=""
@@ -120,7 +118,6 @@ load_ssh_keys() {
         if label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
             fingerprint=$(awk '{print $2}' <<< "$label")
             ALL_KEY_LINES+=("$line")
-            ALL_KEY_LABELS+=("$label")
             ALL_KEY_FINGERPRINTS+=("$fingerprint")
             if [[ "$fingerprint" = "$legacy_fingerprint" ]] ||
                 { [[ -f "$MANAGED_FINGERPRINTS" ]] && grep -Fxq -- "$fingerprint" "$MANAGED_FINGERPRINTS"; }; then
@@ -132,65 +129,23 @@ load_ssh_keys() {
     check_command rm -- "$key_file"
 }
 
-select_existing_ssh_key() {
-    echo -e "${CYAN}${INFO}${NC} Selecting an existing SSH key..."
-    echo -e "${GRAY}  ${ARROW}${NC} Reading keys already installed on the server"
-    echo -e "${GRAY}  ${ARROW}${NC} Confirming the selected key belongs to you"
-    echo -e "${GRAY}  ${ARROW}${NC} Keeping all other keys unchanged"
-    echo
-    local selection fingerprint confirm i
-    for i in "${!ALL_KEY_LABELS[@]}"; do
-        printf '%s. %s\n' "$((i + 1))" "${ALL_KEY_LABELS[$i]}"
-    done
-    echo
-    echo -ne "${CYAN}Enter key number: ${NC}"
-    read -r selection
-    echo
-    if [[ ! "$selection" =~ ^[1-9][0-9]*$ || ${#selection} -gt 6 ]] || (( selection > ${#ALL_KEY_LINES[@]} )); then
-        echo -e "${RED}${CROSS}${NC} Invalid key number."
-        echo
-        exit 1
-    fi
-    SELECTED_KEY="${ALL_KEY_LINES[$((selection - 1))]}"
-    fingerprint="${ALL_KEY_FINGERPRINTS[$((selection - 1))]}"
-    echo -ne "${CYAN}Is this your SSH key (${fingerprint})? (y/n): ${NC}"
-    read -r confirm
-    echo
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        SELECTED_KEY=""
-        SELECTED_FINGERPRINT=""
-        echo -e "${YELLOW}${WARNING}${NC} Cancelled"
-        echo
-        return 1
-    fi
-    SELECTED_FINGERPRINT="$fingerprint"
-    echo -e "${GREEN}${CHECK}${NC} Existing SSH key selected successfully!"
-    echo
-}
-
 select_ssh_key() {
     echo -e "${GREEN}SSH Key Selection${NC}"
     echo -e "${GREEN}=================${NC}"
     echo
     if [[ ${#KEY_LINES[@]} -eq 0 ]]; then
-        select_existing_ssh_key
-        return
+        echo -e "${RED}${CROSS}${NC} No SSH keys installed by this script were found."
+        echo
+        return 1
     fi
     echo -e "${CYAN}${INFO}${NC} Select the key to $1; all other keys will be preserved."
     local i selection
     for i in "${!KEY_LABELS[@]}"; do
         printf '%s. %s\n' "$((i + 1))" "${KEY_LABELS[$i]}"
     done
-    if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt ${#KEY_LINES[@]} ]]; then
-        echo -e "${CYAN}0.${NC} Use another existing SSH key"
-    fi
     echo
     echo -ne "${CYAN}Enter key number: ${NC}"
     read -r selection
-    if [[ "$selection" = 0 && ${#ALL_KEY_FINGERPRINTS[@]} -gt ${#KEY_LINES[@]} ]]; then
-        select_existing_ssh_key
-        return
-    fi
     if [[ ! "$selection" =~ ^[1-9][0-9]*$ || ${#selection} -gt 6 ]] || (( selection > ${#KEY_LINES[@]} )); then
         echo -e "${RED}${CROSS}${NC} Invalid key number."
         echo
@@ -646,7 +601,7 @@ show_main_menu() {
     echo
     echo -e "${CYAN}Please select an option:${NC}"
     echo
-    if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
+    if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
         echo -e "${GREEN}1.${NC} Add SSH key"
         echo -e "${GREEN}2.${NC} Update SSH key"
         echo -e "${RED}3.${NC} Remove SSH key"
@@ -688,7 +643,7 @@ main() {
             install_ssh_key
             ;;
         2)
-            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
+            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
                 update_ssh_key
                 return
             fi
@@ -697,7 +652,7 @@ main() {
             return 0
             ;;
         3)
-            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
+            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
                 remove_ssh_key
                 return
             fi
@@ -705,7 +660,7 @@ main() {
             exit 1
             ;;
         4)
-            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
+            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
                 echo -e "${YELLOW}${WARNING}${NC} Exiting..."
                 echo
                 return 0
