@@ -28,9 +28,11 @@ SSH_DIR="$HOME/.ssh"
 AUTHORIZED_KEYS="${SSH_DIR}/authorized_keys"
 STATE_DIR="${SSH_DIR}/ssh-key-manager"
 BACKUP_CONFIG="${STATE_DIR}/sshd_config.bak"
+MANAGED_FINGERPRINTS="${STATE_DIR}/managed_fingerprints"
 TRANSACTION_DIR=""
 KEY_LINES=()
 KEY_LABELS=()
+ALL_KEY_FINGERPRINTS=()
 
 #===================
 # UTILITY FUNCTIONS
@@ -52,6 +54,9 @@ begin_transaction() {
     if [[ -f "$AUTHORIZED_KEYS" ]]; then
         check_command cp -p "$AUTHORIZED_KEYS" "${TRANSACTION_DIR}/authorized_keys"
     fi
+    if [[ -f "$MANAGED_FINGERPRINTS" ]]; then
+        check_command cp -p "$MANAGED_FINGERPRINTS" "${TRANSACTION_DIR}/managed_fingerprints"
+    fi
     trap rollback_transaction EXIT
     trap 'exit 1' HUP INT TERM
 }
@@ -59,7 +64,8 @@ begin_transaction() {
 finish_transaction() {
     trap - EXIT HUP INT TERM
     check_command rm -f -- "${TRANSACTION_DIR}/sshd_config" "${TRANSACTION_DIR}/authorized_keys" \
-        "${TRANSACTION_DIR}/config.new" "${TRANSACTION_DIR}/key" "${TRANSACTION_DIR}/keys.new"
+        "${TRANSACTION_DIR}/config.new" "${TRANSACTION_DIR}/key" "${TRANSACTION_DIR}/keys.new" \
+        "${TRANSACTION_DIR}/managed_fingerprints" "${TRANSACTION_DIR}/managed.new"
     check_command rmdir "${TRANSACTION_DIR}"
     TRANSACTION_DIR=""
 }
@@ -78,6 +84,11 @@ rollback_transaction() {
     else
         rm -f -- "$AUTHORIZED_KEYS" || exit 1
     fi
+    if [[ -f "${TRANSACTION_DIR}/managed_fingerprints" ]]; then
+        cp -p "${TRANSACTION_DIR}/managed_fingerprints" "$MANAGED_FINGERPRINTS" || exit 1
+    else
+        rm -f -- "$MANAGED_FINGERPRINTS" || exit 1
+    fi
     if ! sshd -t -f "$SSH_CONFIG" || ! systemctl reload ssh; then
         echo -e "${RED}${CROSS}${NC} SSH reload failed. Backup saved in ${BLUE}${TRANSACTION_DIR}${NC}"
         exit 1
@@ -92,15 +103,20 @@ rollback_transaction() {
 load_ssh_keys() {
     KEY_LINES=()
     KEY_LABELS=()
+    ALL_KEY_FINGERPRINTS=()
     [[ -f "$AUTHORIZED_KEYS" ]] || return 0
-    local line label key_file
+    local line label key_file fingerprint
     key_file=$(mktemp) || exit 1
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
         printf '%s\n' "$line" > "$key_file"
         if label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
-            KEY_LINES+=("$line")
-            KEY_LABELS+=("$label")
+            fingerprint=$(awk '{print $2}' <<< "$label")
+            ALL_KEY_FINGERPRINTS+=("$fingerprint")
+            if [[ -f "$MANAGED_FINGERPRINTS" ]] && grep -Fxq -- "$fingerprint" "$MANAGED_FINGERPRINTS"; then
+                KEY_LINES+=("$line")
+                KEY_LABELS+=("$label")
+            fi
         fi
     done < "$AUTHORIZED_KEYS"
     check_command rm -- "$key_file"
@@ -124,6 +140,7 @@ select_ssh_key() {
         exit 1
     fi
     SELECTED_KEY="${KEY_LINES[$((selection - 1))]}"
+    SELECTED_FINGERPRINT=$(awk '{print $2}' <<< "${KEY_LABELS[$((selection - 1))]}")
     echo
 }
 
@@ -132,6 +149,9 @@ remove_selected_key() {
     check_command awk 'NR == FNR { key = $0; next } $0 != key' \
         "${TRANSACTION_DIR}/key" "$AUTHORIZED_KEYS" > "${TRANSACTION_DIR}/keys.new"
     check_command cp "${TRANSACTION_DIR}/keys.new" "$AUTHORIZED_KEYS"
+    check_command awk -v fingerprint="$SELECTED_FINGERPRINT" '$0 != fingerprint' \
+        "$MANAGED_FINGERPRINTS" > "${TRANSACTION_DIR}/managed.new"
+    check_command cp "${TRANSACTION_DIR}/managed.new" "$MANAGED_FINGERPRINTS"
 }
 
 effective_ssh_configuration() {
@@ -251,8 +271,8 @@ input_public_key() {
         exit 1
     fi
     fingerprint=$(awk '{print $2}' <<< "$label")
-    for installed in "${KEY_LABELS[@]}"; do
-        if [[ "$(awk '{print $2}' <<< "$installed")" = "$fingerprint" ]]; then
+    for installed in "${ALL_KEY_FINGERPRINTS[@]}"; do
+        if [[ "$installed" = "$fingerprint" ]]; then
             echo -e "${RED}${CROSS}${NC} This public key is already installed. Use a new key."
             echo
             exit 1
@@ -264,6 +284,11 @@ input_public_key() {
     echo -e "${GRAY}  ${ARROW}${NC} Appending public key to file"
     if ! printf '\n%s\n' "$public_key" >> "${AUTHORIZED_KEYS}"; then
         echo -e "${RED}${CROSS}${NC} FAILED: Adding public key to ${BLUE}${AUTHORIZED_KEYS}${NC}"
+        echo
+        exit 1
+    fi
+    if ! printf '%s\n' "$fingerprint" >> "$MANAGED_FINGERPRINTS"; then
+        echo -e "${RED}${CROSS}${NC} FAILED: Saving managed SSH key fingerprint"
         echo
         exit 1
     fi
