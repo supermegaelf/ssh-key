@@ -405,10 +405,10 @@ test_ssh_connection() {
     server_port="${server_port:-22}"
     if [[ "$method" = password ]]; then
         echo -e "${GRAY}  ${ARROW}${NC} Use the server password. Set one with passwd in this session if needed."
-        echo -e "${WHITE}ssh -p ${server_port} -o PubkeyAuthentication=no -o PreferredAuthentications=password root@${server_ip}${NC}"
+        echo -e "${WHITE}ssh -F none -S none -p ${server_port} -o PubkeyAuthentication=no -o PreferredAuthentications=password root@${server_ip}${NC}"
     else
         echo -e "${GRAY}  ${ARROW}${NC} Use the private key matching the public key just added."
-        echo -e "${WHITE}ssh -p ${server_port} -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -i \"PATH_TO_PRIVATE_KEY\" root@${server_ip}${NC}"
+        echo -e "${WHITE}ssh -F none -S none -p ${server_port} -o IdentityAgent=none -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -i \"PATH_TO_PRIVATE_KEY\" root@${server_ip}${NC}"
     fi
     echo
     echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
@@ -549,9 +549,10 @@ show_main_menu() {
     echo -e "${CYAN}Please select an option:${NC}"
     echo
     if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
-        echo -e "${GREEN}1.${NC} Update SSH key"
-        echo -e "${RED}2.${NC} Remove SSH key"
-        echo -e "${YELLOW}3.${NC} Exit"
+        echo -e "${GREEN}1.${NC} Add SSH key"
+        echo -e "${GREEN}2.${NC} Update SSH key"
+        echo -e "${RED}3.${NC} Remove SSH key"
+        echo -e "${YELLOW}4.${NC} Exit"
     else
         echo -e "${GREEN}1.${NC} Setup SSH key"
         echo -e "${YELLOW}2.${NC} Exit"
@@ -572,20 +573,24 @@ main() {
         exit 1
     fi
 
+    exec 9>/run/ssh-key-manager.lock || exit 1
+    if ! flock -n 9; then
+        echo -e "${RED}${CROSS}${NC} Cannot acquire SSH key manager lock. Another instance may be running."
+        echo
+        exit 1
+    fi
+
     show_main_menu
     local choice
     read -r choice
     case "$choice" in
         1)
-            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
-                update_ssh_key
-            else
-                install_ssh_key
-            fi
+            SELECTED_KEY=""
+            install_ssh_key
             ;;
         2)
             if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
-                remove_ssh_key
+                update_ssh_key
                 return
             fi
             echo
@@ -594,6 +599,14 @@ main() {
             return 0
             ;;
         3)
+            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
+                remove_ssh_key
+                return
+            fi
+            echo -e "${RED}${CROSS}${NC} Invalid option. Please enter 1-2."
+            exit 1
+            ;;
+        4)
             if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
                 echo
                 echo -e "${YELLOW}${WARNING}${NC} Exiting..."
