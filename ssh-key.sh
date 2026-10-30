@@ -24,9 +24,11 @@ readonly ARROW="→"
 
 # Global variables
 SSH_CONFIG="/etc/ssh/sshd_config"
-BACKUP_CONFIG="${SSH_CONFIG}.bak.$(date +%F_%T)"
 SSH_DIR="$HOME/.ssh"
 AUTHORIZED_KEYS="${SSH_DIR}/authorized_keys"
+STATE_DIR="${SSH_DIR}/ssh-key-manager"
+BACKUP_CONFIG="${STATE_DIR}/sshd_config.bak"
+MANAGED_KEY="${STATE_DIR}/public_key"
 
 #===================
 # UTILITY FUNCTIONS
@@ -124,16 +126,29 @@ input_public_key() {
 
     echo
     echo -ne "${CYAN}Insert public key and press Enter: ${NC}"
-    read public_key
+    IFS= read -r public_key
     public_key="${public_key#"${public_key%%[![:space:]]*}"}"
     public_key="${public_key%"${public_key##*[![:space:]]}"}"
+    if [[ -z "$public_key" ]]; then
+        echo -e "${RED}${CROSS}${NC} Public key cannot be empty."
+        exit 1
+    fi
     echo
 
     echo -e "${CYAN}${INFO}${NC} Adding public key to authorized keys..."
     echo -e "${GRAY}  ${ARROW}${NC} Creating authorized_keys file"
     echo -e "${GRAY}  ${ARROW}${NC} Appending public key to file"
-    touch "${AUTHORIZED_KEYS}"
-    if ! echo "$public_key" >> "${AUTHORIZED_KEYS}"; then
+    check_command touch "${AUTHORIZED_KEYS}"
+    check_command touch "${MANAGED_KEY}"
+    if grep -Fxq -- "$public_key" "${AUTHORIZED_KEYS}"; then
+        echo -e "${YELLOW}${WARNING}${NC} Public key already exists; it will be preserved on removal."
+        return
+    fi
+    if ! printf '%s\n' "$public_key" > "$MANAGED_KEY"; then
+        echo -e "${RED}${CROSS}${NC} FAILED: Saving managed public key."
+        exit 1
+    fi
+    if ! printf '\n%s\n' "$public_key" >> "${AUTHORIZED_KEYS}"; then
         echo -e "${RED}${CROSS}${NC} FAILED: Adding public key to ${BLUE}${AUTHORIZED_KEYS}${NC}"
         echo
         exit 1
@@ -173,8 +188,9 @@ create_configuration_backup() {
 
     echo -e "${CYAN}${INFO}${NC} Creating SSH configuration backup..."
     echo -e "${GRAY}  ${ARROW}${NC} Backing up to ${BLUE}${BACKUP_CONFIG}${NC}"
-    echo -e "${GRAY}  ${ARROW}${NC} Creating timestamped backup file"
-    check_command cp "${SSH_CONFIG}" "${BACKUP_CONFIG}"
+    echo -e "${GRAY}  ${ARROW}${NC} Saving original configuration for removal"
+    check_command mkdir -m 700 "${STATE_DIR}"
+    check_command cp -p "${SSH_CONFIG}" "${BACKUP_CONFIG}"
     echo -e "${GRAY}  ${ARROW}${NC} Configuration backup created successfully"
     echo -e "${GREEN}${CHECK}${NC} Configuration backup created!"
     echo
@@ -292,7 +308,7 @@ display_completion_info() {
 # MAIN ENTRY POINT
 #==================
 
-main() {
+install_ssh_key() {
     echo
     echo -e "${PURPLE}================${NC}"
     echo -e "${WHITE}SSH KEY MANAGER${NC}"
@@ -302,14 +318,84 @@ main() {
     verify_ssh_service
     display_key_generation_instructions
     setup_ssh_directory
+    create_configuration_backup
     input_public_key
     set_file_permissions
-    create_configuration_backup
     update_ssh_configuration
     validate_ssh_configuration
     restart_ssh_service
     test_ssh_connection
     display_completion_info
+}
+
+remove_ssh_key() {
+    echo
+    echo -e "${YELLOW}${WARNING}${NC} This will restore the entire SSH config saved before setup and remove only the key added by this script."
+    echo -e "${YELLOW}${WARNING}${NC} Keep this session open and verify access in a new terminal afterwards."
+    echo -ne "${YELLOW}Are you sure? (y/n): ${NC}"
+    local confirm current_config filtered_keys
+    read -r confirm
+    [[ "$confirm" =~ ^[Yy]$ ]] || return 0
+
+    verify_ssh_service
+    check_command sshd -t -f "${BACKUP_CONFIG}"
+    current_config=$(mktemp "${SSH_CONFIG}.remove.XXXXXX") || exit 1
+    check_command cp -p "${SSH_CONFIG}" "$current_config"
+    check_command cp -p "${BACKUP_CONFIG}" "${SSH_CONFIG}"
+    if ! sshd -t || ! systemctl restart ssh; then
+        echo -e "${RED}${CROSS}${NC} Restore failed; reverting to the current SSH config."
+        check_command cp -p "$current_config" "${SSH_CONFIG}"
+        check_command systemctl restart ssh
+        check_command rm -- "$current_config"
+        exit 1
+    fi
+    check_command rm -- "$current_config"
+
+    if [[ -s "$MANAGED_KEY" && -f "$AUTHORIZED_KEYS" ]]; then
+        filtered_keys=$(mktemp "${STATE_DIR}/authorized_keys.XXXXXX") || exit 1
+        check_command awk 'NR == FNR { key = $0; next } $0 != key' "$MANAGED_KEY" "$AUTHORIZED_KEYS" > "$filtered_keys"
+        check_command cp "$filtered_keys" "${AUTHORIZED_KEYS}"
+        check_command rm -- "$filtered_keys"
+    fi
+    check_command rm -f -- "$MANAGED_KEY" "${BACKUP_CONFIG}"
+    check_command rmdir "${STATE_DIR}"
+    echo -e "${GREEN}${CHECK}${NC} SSH key setup removed. Original SSH configuration restored."
+}
+
+main() {
+    exec < /dev/tty
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}${CROSS}${NC} Script must be run as root."
+        exit 1
+    fi
+
+    echo
+    echo -e "${WHITE}SSH KEY MANAGER${NC}"
+    echo
+    if [[ -d "$STATE_DIR" ]]; then
+        echo -e "${RED}1.${NC} Remove SSH key setup"
+    else
+        echo -e "${GREEN}1.${NC} Setup SSH key"
+    fi
+    echo -e "${YELLOW}2.${NC} Exit"
+    echo
+    echo -ne "${CYAN}Enter your choice: ${NC}"
+    local choice
+    read -r choice
+    case "$choice" in
+        1)
+            if [[ -d "$STATE_DIR" ]]; then
+                remove_ssh_key
+            else
+                install_ssh_key
+            fi
+            ;;
+        2) return 0 ;;
+        *)
+            echo -e "${RED}${CROSS}${NC} Invalid option. Please enter 1-2."
+            exit 1
+            ;;
+    esac
 }
 
 # Execute main function
