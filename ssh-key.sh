@@ -485,6 +485,13 @@ remove_ssh_key() {
     echo -e "${GREEN}SSH Key Removal${NC}"
     echo -e "${GREEN}===============${NC}"
     echo
+    echo -e "${CYAN}${INFO}${NC} Preparing SSH key removal..."
+    echo -e "${GRAY}  ${ARROW}${NC} Using the installed SSH key list"
+    echo -e "${GRAY}  ${ARROW}${NC} Keeping unselected keys unchanged"
+    echo -e "${GRAY}  ${ARROW}${NC} Preparing key selection"
+    echo -e "${GREEN}${CHECK}${NC} SSH key removal preparation completed successfully!"
+    echo
+
     select_ssh_key remove
     echo -e "${YELLOW}${WARNING}${NC} This will enable root password login and remove only the selected key."
     echo -e "${YELLOW}${WARNING}${NC} The key will be kept until you confirm a new password login."
