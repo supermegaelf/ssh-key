@@ -32,6 +32,7 @@ MANAGED_FINGERPRINTS="${STATE_DIR}/managed_fingerprints"
 TRANSACTION_DIR=""
 KEY_LINES=()
 KEY_LABELS=()
+ALL_KEY_LINES=()
 ALL_KEY_FINGERPRINTS=()
 
 #===================
@@ -103,6 +104,7 @@ rollback_transaction() {
 load_ssh_keys() {
     KEY_LINES=()
     KEY_LABELS=()
+    ALL_KEY_LINES=()
     ALL_KEY_FINGERPRINTS=()
     [[ -f "$AUTHORIZED_KEYS" ]] || return 0
     local line label key_file fingerprint
@@ -112,6 +114,7 @@ load_ssh_keys() {
         printf '%s\n' "$line" > "$key_file"
         if label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
             fingerprint=$(awk '{print $2}' <<< "$label")
+            ALL_KEY_LINES+=("$line")
             ALL_KEY_FINGERPRINTS+=("$fingerprint")
             if [[ -f "$MANAGED_FINGERPRINTS" ]] && grep -Fxq -- "$fingerprint" "$MANAGED_FINGERPRINTS"; then
                 KEY_LINES+=("$line")
@@ -122,18 +125,79 @@ load_ssh_keys() {
     check_command rm -- "$key_file"
 }
 
+select_existing_ssh_key() {
+    echo -e "${CYAN}${INFO}${NC} Identifying an existing SSH key..."
+    echo -e "${GRAY}  ${ARROW}${NC} Reading your existing public key"
+    echo -e "${GRAY}  ${ARROW}${NC} Matching its fingerprint against installed keys"
+    echo -e "${GRAY}  ${ARROW}${NC} Keeping all other keys unchanged"
+    echo
+    echo -ne "${CYAN}Insert your existing public key and press Enter: ${NC}"
+    local existing_key key_file label fingerprint confirm i
+    IFS= read -r existing_key
+    existing_key="${existing_key#"${existing_key%%[![:space:]]*}"}"
+    existing_key="${existing_key%"${existing_key##*[![:space:]]}"}"
+    echo
+    key_file=$(mktemp) || exit 1
+    printf '%s\n' "$existing_key" > "$key_file" || exit 1
+    if [[ ! "$existing_key" =~ ^(ssh-|ecdsa-|sk-) ]] ||
+        ! label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
+        check_command rm -- "$key_file"
+        echo -e "${RED}${CROSS}${NC} Invalid public key."
+        echo
+        exit 1
+    fi
+    check_command rm -- "$key_file"
+    fingerprint=$(awk '{print $2}' <<< "$label")
+    SELECTED_KEY=""
+    for i in "${!ALL_KEY_FINGERPRINTS[@]}"; do
+        if [[ "${ALL_KEY_FINGERPRINTS[$i]}" = "$fingerprint" ]]; then
+            SELECTED_KEY="${ALL_KEY_LINES[$i]}"
+            break
+        fi
+    done
+    if [[ -z "$SELECTED_KEY" ]]; then
+        echo -e "${RED}${CROSS}${NC} This public key is not installed."
+        echo
+        exit 1
+    fi
+    echo -ne "${CYAN}Is this your SSH key (${fingerprint})? (y/n): ${NC}"
+    read -r confirm
+    echo
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        SELECTED_KEY=""
+        SELECTED_FINGERPRINT=""
+        echo -e "${YELLOW}${WARNING}${NC} Cancelled"
+        echo
+        return 1
+    fi
+    SELECTED_FINGERPRINT="$fingerprint"
+    echo -e "${GREEN}${CHECK}${NC} Existing SSH key selected successfully!"
+    echo
+}
+
 select_ssh_key() {
     echo -e "${GREEN}SSH Key Selection${NC}"
     echo -e "${GREEN}=================${NC}"
     echo
+    if [[ ${#KEY_LINES[@]} -eq 0 ]]; then
+        select_existing_ssh_key
+        return
+    fi
     echo -e "${CYAN}${INFO}${NC} Select the key to $1; all other keys will be preserved."
     local i selection
     for i in "${!KEY_LABELS[@]}"; do
         printf '%s. %s\n' "$((i + 1))" "${KEY_LABELS[$i]}"
     done
+    if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt ${#KEY_LINES[@]} ]]; then
+        echo -e "${CYAN}0.${NC} Use another existing SSH key"
+    fi
     echo
     echo -ne "${CYAN}Enter key number: ${NC}"
     read -r selection
+    if [[ "$selection" = 0 && ${#ALL_KEY_FINGERPRINTS[@]} -gt ${#KEY_LINES[@]} ]]; then
+        select_existing_ssh_key
+        return
+    fi
     if [[ ! "$selection" =~ ^[1-9][0-9]*$ || ${#selection} -gt 6 ]] || (( selection > ${#KEY_LINES[@]} )); then
         echo -e "${RED}${CROSS}${NC} Invalid key number."
         echo
@@ -145,13 +209,26 @@ select_ssh_key() {
 }
 
 remove_selected_key() {
-    printf '%s\n' "$SELECTED_KEY" > "${TRANSACTION_DIR}/key" || exit 1
-    check_command awk 'NR == FNR { key = $0; next } $0 != key' \
+    local i
+    : > "${TRANSACTION_DIR}/key" || exit 1
+    for i in "${!ALL_KEY_FINGERPRINTS[@]}"; do
+        if [[ "${ALL_KEY_FINGERPRINTS[$i]}" = "$SELECTED_FINGERPRINT" ]]; then
+            printf '%s\n' "${ALL_KEY_LINES[$i]}" >> "${TRANSACTION_DIR}/key" || exit 1
+        fi
+    done
+    if [[ ! -s "${TRANSACTION_DIR}/key" ]]; then
+        echo -e "${RED}${CROSS}${NC} Selected SSH key was not found."
+        echo
+        exit 1
+    fi
+    check_command awk 'NR == FNR { keys[$0] = 1; next } !($0 in keys)' \
         "${TRANSACTION_DIR}/key" "$AUTHORIZED_KEYS" > "${TRANSACTION_DIR}/keys.new"
     check_command cp "${TRANSACTION_DIR}/keys.new" "$AUTHORIZED_KEYS"
-    check_command awk -v fingerprint="$SELECTED_FINGERPRINT" '$0 != fingerprint' \
-        "$MANAGED_FINGERPRINTS" > "${TRANSACTION_DIR}/managed.new"
-    check_command cp "${TRANSACTION_DIR}/managed.new" "$MANAGED_FINGERPRINTS"
+    if [[ -f "$MANAGED_FINGERPRINTS" ]]; then
+        check_command awk -v fingerprint="$SELECTED_FINGERPRINT" '$0 != fingerprint' \
+            "$MANAGED_FINGERPRINTS" > "${TRANSACTION_DIR}/managed.new"
+        check_command cp "${TRANSACTION_DIR}/managed.new" "$MANAGED_FINGERPRINTS"
+    fi
 }
 
 effective_ssh_configuration() {
@@ -498,7 +575,7 @@ install_ssh_key() {
 #================
 
 update_ssh_key() {
-    select_ssh_key update
+    select_ssh_key update || return 0
     install_ssh_key
 }
 
@@ -517,7 +594,7 @@ remove_ssh_key() {
     echo -e "${GREEN}${CHECK}${NC} SSH key removal preparation completed successfully!"
     echo
 
-    select_ssh_key remove
+    select_ssh_key remove || return 0
     echo -e "${YELLOW}${WARNING}${NC} This will enable root password login and remove only the selected key."
     echo -e "${YELLOW}${WARNING}${NC} The key will be kept until you confirm a new password login."
     echo -ne "${YELLOW}Are you sure? (y/n): ${NC}"
@@ -576,7 +653,7 @@ show_main_menu() {
     echo
     echo -e "${CYAN}Please select an option:${NC}"
     echo
-    if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
+    if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
         echo -e "${GREEN}1.${NC} Add SSH key"
         echo -e "${GREEN}2.${NC} Update SSH key"
         echo -e "${RED}3.${NC} Remove SSH key"
@@ -618,7 +695,7 @@ main() {
             install_ssh_key
             ;;
         2)
-            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
+            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
                 update_ssh_key
                 return
             fi
@@ -627,7 +704,7 @@ main() {
             return 0
             ;;
         3)
-            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
+            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
                 remove_ssh_key
                 return
             fi
@@ -635,7 +712,7 @@ main() {
             exit 1
             ;;
         4)
-            if [[ ${#KEY_LINES[@]} -gt 0 ]]; then
+            if [[ ${#ALL_KEY_FINGERPRINTS[@]} -gt 0 ]]; then
                 echo -e "${YELLOW}${WARNING}${NC} Exiting..."
                 echo
                 return 0
