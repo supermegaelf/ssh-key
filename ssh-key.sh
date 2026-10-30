@@ -543,8 +543,8 @@ remove_ssh_key() {
     echo
 
     select_ssh_key remove || return 0
-    echo -e "${YELLOW}${WARNING}${NC} This will enable root password login and remove only the selected key."
-    echo -e "${YELLOW}${WARNING}${NC} The key will be kept until you confirm a new password login."
+    echo -e "${YELLOW}${WARNING}${NC} This will enable root password login and remove only the selected key. The key will be kept until you confirm a new password login."
+    echo
     echo -ne "${YELLOW}Are you sure? (y/n): ${NC}"
     local confirm
     read -r confirm
