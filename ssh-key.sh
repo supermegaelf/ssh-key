@@ -33,6 +33,7 @@ TRANSACTION_DIR=""
 KEY_LINES=()
 KEY_LABELS=()
 ALL_KEY_LINES=()
+ALL_KEY_LABELS=()
 ALL_KEY_FINGERPRINTS=()
 
 #===================
@@ -105,9 +106,13 @@ load_ssh_keys() {
     KEY_LINES=()
     KEY_LABELS=()
     ALL_KEY_LINES=()
+    ALL_KEY_LABELS=()
     ALL_KEY_FINGERPRINTS=()
     [[ -f "$AUTHORIZED_KEYS" ]] || return 0
-    local line label key_file fingerprint
+    local line label key_file fingerprint legacy_label legacy_fingerprint=""
+    if [[ -s "${STATE_DIR}/public_key" ]] && legacy_label=$(ssh-keygen -lf "${STATE_DIR}/public_key" 2>/dev/null); then
+        legacy_fingerprint=$(awk '{print $2}' <<< "$legacy_label")
+    fi
     key_file=$(mktemp) || exit 1
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
@@ -115,8 +120,10 @@ load_ssh_keys() {
         if label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
             fingerprint=$(awk '{print $2}' <<< "$label")
             ALL_KEY_LINES+=("$line")
+            ALL_KEY_LABELS+=("$label")
             ALL_KEY_FINGERPRINTS+=("$fingerprint")
-            if [[ -f "$MANAGED_FINGERPRINTS" ]] && grep -Fxq -- "$fingerprint" "$MANAGED_FINGERPRINTS"; then
+            if [[ "$fingerprint" = "$legacy_fingerprint" ]] ||
+                { [[ -f "$MANAGED_FINGERPRINTS" ]] && grep -Fxq -- "$fingerprint" "$MANAGED_FINGERPRINTS"; }; then
                 KEY_LINES+=("$line")
                 KEY_LABELS+=("$label")
             fi
@@ -126,40 +133,26 @@ load_ssh_keys() {
 }
 
 select_existing_ssh_key() {
-    echo -e "${CYAN}${INFO}${NC} Identifying an existing SSH key..."
-    echo -e "${GRAY}  ${ARROW}${NC} Reading your existing public key"
-    echo -e "${GRAY}  ${ARROW}${NC} Matching its fingerprint against installed keys"
+    echo -e "${CYAN}${INFO}${NC} Selecting an existing SSH key..."
+    echo -e "${GRAY}  ${ARROW}${NC} Reading keys already installed on the server"
+    echo -e "${GRAY}  ${ARROW}${NC} Confirming the selected key belongs to you"
     echo -e "${GRAY}  ${ARROW}${NC} Keeping all other keys unchanged"
     echo
-    echo -ne "${CYAN}Insert your existing public key and press Enter: ${NC}"
-    local existing_key key_file label fingerprint confirm i
-    IFS= read -r existing_key
-    existing_key="${existing_key#"${existing_key%%[![:space:]]*}"}"
-    existing_key="${existing_key%"${existing_key##*[![:space:]]}"}"
-    echo
-    key_file=$(mktemp) || exit 1
-    printf '%s\n' "$existing_key" > "$key_file" || exit 1
-    if [[ ! "$existing_key" =~ ^(ssh-|ecdsa-|sk-) ]] ||
-        ! label=$(ssh-keygen -lf "$key_file" 2>/dev/null); then
-        check_command rm -- "$key_file"
-        echo -e "${RED}${CROSS}${NC} Invalid public key."
-        echo
-        exit 1
-    fi
-    check_command rm -- "$key_file"
-    fingerprint=$(awk '{print $2}' <<< "$label")
-    SELECTED_KEY=""
-    for i in "${!ALL_KEY_FINGERPRINTS[@]}"; do
-        if [[ "${ALL_KEY_FINGERPRINTS[$i]}" = "$fingerprint" ]]; then
-            SELECTED_KEY="${ALL_KEY_LINES[$i]}"
-            break
-        fi
+    local selection fingerprint confirm i
+    for i in "${!ALL_KEY_LABELS[@]}"; do
+        printf '%s. %s\n' "$((i + 1))" "${ALL_KEY_LABELS[$i]}"
     done
-    if [[ -z "$SELECTED_KEY" ]]; then
-        echo -e "${RED}${CROSS}${NC} This public key is not installed."
+    echo
+    echo -ne "${CYAN}Enter key number: ${NC}"
+    read -r selection
+    echo
+    if [[ ! "$selection" =~ ^[1-9][0-9]*$ || ${#selection} -gt 6 ]] || (( selection > ${#ALL_KEY_LINES[@]} )); then
+        echo -e "${RED}${CROSS}${NC} Invalid key number."
         echo
         exit 1
     fi
+    SELECTED_KEY="${ALL_KEY_LINES[$((selection - 1))]}"
+    fingerprint="${ALL_KEY_FINGERPRINTS[$((selection - 1))]}"
     echo -ne "${CYAN}Is this your SSH key (${fingerprint})? (y/n): ${NC}"
     read -r confirm
     echo
