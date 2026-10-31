@@ -448,7 +448,7 @@ test_ssh_connection() {
     echo -e "${GREEN}==================${NC}"
     echo
 
-    echo -e "${CYAN}${INFO}${NC} Testing SSH connection..."
+    echo -e "${CYAN}${INFO}${NC} Preparing SSH connection test..."
     echo -e "${GRAY}  ${ARROW}${NC} Keep the current session open"
     echo -e "${GRAY}  ${ARROW}${NC} Open a new terminal with connection sharing disabled"
     if [[ "$method" = password ]]; then
@@ -456,12 +456,13 @@ test_ssh_connection() {
     else
         echo -e "${GRAY}  ${ARROW}${NC} Use only the new key; disable SSH agent and password fallback"
     fi
+    echo -e "${GREEN}${CHECK}${NC} SSH connection test prepared successfully!"
     echo
     echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
     read -r success
 
     if [[ "$success" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}${CHECK}${NC} SSH connection tested successfully!"
+        :
     else
         echo
         echo -e "${RED}${CROSS}${NC} Connection failed. Reverting changes..."
