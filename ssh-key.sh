@@ -457,17 +457,27 @@ test_ssh_connection() {
     fi
     echo -e "${GREEN}${CHECK}${NC} SSH connection test prepared successfully!"
     echo
-    echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
-    read -r success
-
-    if [[ "$success" =~ ^[Yy]$ ]]; then
-        :
-    else
-        echo
-        echo -e "${RED}${CROSS}${NC} Connection failed. Reverting changes..."
-        echo
-        exit 1
-    fi
+    while true; do
+        echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
+        if ! IFS= read -r success; then
+            echo
+            exit 1
+        fi
+        case "$success" in
+            y|Y) break ;;
+            n|N)
+                echo
+                echo -e "${RED}${CROSS}${NC} Connection failed. Reverting changes..."
+                echo
+                exit 1
+                ;;
+            *)
+                echo
+                echo -e "${YELLOW}${WARNING}${NC} Invalid answer. Enter y or n."
+                echo
+                ;;
+        esac
+    done
 
     echo
 }
