@@ -74,8 +74,6 @@ finish_transaction() {
 rollback_transaction() {
     local result=$?
     trap - EXIT HUP INT TERM
-    echo
-    echo -e "${YELLOW}${WARNING}${NC} Operation cancelled or failed. Restoring SSH configuration and keys..."
     if ! cp -p "${TRANSACTION_DIR}/sshd_config" "$SSH_CONFIG"; then
         echo -e "${RED}${CROSS}${NC} Restore failed. Backup saved in ${BLUE}${TRANSACTION_DIR}${NC}"
         exit 1
@@ -95,7 +93,7 @@ rollback_transaction() {
         exit 1
     fi
     finish_transaction
-    echo -e "${YELLOW}${WARNING}${NC} Previous SSH configuration and keys restored."
+    echo -e "${YELLOW}${WARNING}${NC} Operation cancelled or failed. Previous SSH configuration and keys restored."
     echo
     [[ $result -ne 0 ]] || result=1
     exit "$result"
