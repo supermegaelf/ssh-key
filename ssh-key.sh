@@ -136,7 +136,8 @@ select_ssh_key() {
         echo
         return 1
     fi
-    echo -e "${CYAN}${INFO}${NC} Select the key to $1; all other keys will be preserved."
+    echo -e "${CYAN}Select the key to $1:${NC}"
+    echo
     local i selection
     for i in "${!KEY_LABELS[@]}"; do
         printf '%s. %s\n' "$((i + 1))" "${KEY_LABELS[$i]}"
