@@ -569,8 +569,6 @@ remove_ssh_key() {
     verify_authentication_settings yes
     reload_ssh_service
     test_ssh_connection password
-    echo -e "${GREEN}${CHECK}${NC} SSH configuration restored!"
-    echo
 
     echo -e "${GREEN}Public Key Removal${NC}"
     echo -e "${GREEN}==================${NC}"
