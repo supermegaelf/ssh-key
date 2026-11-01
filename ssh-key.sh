@@ -491,12 +491,6 @@ display_completion_info() {
     echo -e "${GREEN}${CHECK}${NC} Installation complete!"
     echo -e "${PURPLE}=========================${NC}"
     echo
-    echo -e "${CYAN}Configuration Summary:${NC}"
-    echo -e "${WHITE}• SSH key-based authentication enabled${NC}"
-    echo -e "${WHITE}• Password authentication disabled${NC}"
-    echo -e "${WHITE}• Public key added to authorized_keys${NC}"
-    echo -e "${WHITE}• Original config backed up to: ${BACKUP_CONFIG}${NC}"
-    echo
 }
 
 #======================
