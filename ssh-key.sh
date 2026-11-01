@@ -459,7 +459,7 @@ test_ssh_connection() {
     echo
     while true; do
         echo -ne "${CYAN}Connection successful? (y/n): ${NC}"
-        if ! IFS= read -r success; then
+        if ! IFS= LC_ALL=C.UTF-8 read -r -e success; then
             echo
             exit 1
         fi
