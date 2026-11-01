@@ -144,7 +144,7 @@ select_ssh_key() {
     done
     echo
     echo -ne "${CYAN}Enter key number: ${NC}"
-    read -r selection
+    LC_ALL=C.UTF-8 read -r -e selection
     if [[ ! "$selection" =~ ^[1-9][0-9]*$ || ${#selection} -gt 6 ]] || (( selection > ${#KEY_LINES[@]} )); then
         echo -e "${RED}${CROSS}${NC} Invalid key number."
         echo
@@ -281,7 +281,7 @@ input_public_key() {
 
     echo
     echo -ne "${CYAN}Insert public key and press Enter: ${NC}"
-    IFS= read -r public_key
+    IFS= LC_ALL=C.UTF-8 read -r -e public_key
     public_key="${public_key#"${public_key%%[![:space:]]*}"}"
     public_key="${public_key%"${public_key##*[![:space:]]}"}"
     echo
@@ -557,7 +557,7 @@ remove_ssh_key() {
     echo
     echo -ne "${YELLOW}Are you sure? (y/n): ${NC}"
     local confirm
-    read -r confirm
+    LC_ALL=C.UTF-8 read -r -e confirm
     echo
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}${WARNING}${NC} Cancelled"
@@ -638,7 +638,7 @@ main() {
 
     show_main_menu
     local choice
-    read -r choice
+    LC_ALL=C.UTF-8 read -r -e choice
     echo
     case "$choice" in
         1)
