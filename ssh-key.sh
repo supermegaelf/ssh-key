@@ -569,11 +569,6 @@ remove_ssh_key() {
     begin_transaction
     create_configuration_backup
 
-    echo -e "${GREEN}Configuration Restore${NC}"
-    echo -e "${GREEN}=====================${NC}"
-    echo
-    echo -e "${CYAN}${INFO}${NC} Restoring password access..."
-    echo -e "${GRAY}  ${ARROW}${NC} Preserving provider settings and all other keys"
     update_ssh_configuration yes
     validate_ssh_configuration
     verify_authentication_settings yes
