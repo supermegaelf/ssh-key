@@ -200,6 +200,7 @@ verify_authentication_settings() {
         ! grep -qx "passwordauthentication $mode" <<< "$config" ||
         ! grep -qx 'kbdinteractiveauthentication no' <<< "$config" ||
         { [[ "$mode" = yes ]] && ! grep -qx 'permitrootlogin yes' <<< "$config"; } ||
+        { [[ "$mode" = no ]] && ! grep -Eq '^permitrootlogin (yes|prohibit-password|without-password)$' <<< "$config"; } ||
         ! grep -Eq "^authenticationmethods (any|$method)$" <<< "$config"; then
         echo -e "${RED}${CROSS}${NC} Effective SSH settings do not allow the requested login method. Check Include and Match rules."
         echo
@@ -432,6 +433,7 @@ reload_ssh_service() {
     echo -e "${GRAY}  ${ARROW}${NC} Applying new configuration"
     echo -e "${GRAY}  ${ARROW}${NC} Reloading SSH daemon"
     check_command systemctl reload ssh
+    check_command systemctl is-active --quiet ssh
     echo -e "${GRAY}  ${ARROW}${NC} SSH service reloaded with new settings"
     echo -e "${GREEN}${CHECK}${NC} SSH service reloaded successfully!"
     echo
@@ -513,8 +515,6 @@ install_ssh_key() {
     validate_ssh_configuration
     verify_authentication_settings no
     reload_ssh_service
-    # Check a fresh connection after applying the final authentication settings.
-    test_ssh_connection
     if [[ -n "$SELECTED_KEY" ]]; then
         remove_selected_key
     fi
